@@ -1,0 +1,548 @@
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('BoteComun JS cargado');
+  
+  const STORAGE_KEY = 'botecomun_v2';
+  
+  // DOM elements
+  const form = document.getElementById('entry-form');
+  const inputName = document.getElementById('input-name');
+  const inputPlace = document.getElementById('input-place');
+  const inputAmount = document.getElementById('input-amount');
+  const inputType = document.getElementById('input-type');
+
+  const btnAdd = document.getElementById('btn-add');
+  const btnPay = document.getElementById('btn-pay');
+  const btnQuick5 = document.getElementById('btn-quick-5');
+  const btnQuick10 = document.getElementById('btn-quick-10');
+  const btnReset = document.getElementById('btn-reset');
+
+  const statAdded = document.getElementById('stat-added');
+  const statPaid = document.getElementById('stat-paid');
+  const statBalance = document.getElementById('stat-balance');
+  const txList = document.getElementById('tx-list');
+
+  const toastOverlay = document.getElementById('toast-overlay');
+  const toastConfirm = document.getElementById('toast-confirm');
+  const toastCancel = document.getElementById('toast-cancel');
+
+  const cOverlay = document.getElementById('center-toast');
+  const cTitle = document.getElementById('center-toast-title');
+  const cMsg = document.getElementById('center-toast-msg');
+  const cBtnCancel = document.getElementById('center-toast-cancel');
+  const cBtnAccept = document.getElementById('center-toast-accept');
+  const notifyEl = document.getElementById('notify');
+
+  // Verificar elementos críticos
+  if (!form || !btnAdd || !btnPay) {
+    console.error('Elementos críticos no encontrados');
+    return;
+  }
+
+  // State
+  let state = { transactions: [], totals: { added: 0, paid: 0, balance: 0 } };
+
+  // Firebase detection (con timeout)
+  let hasFirebase = false;
+  let db = null;
+  let auth = null;
+  
+  // Esperar un poco para que Firebase se inicialice
+  setTimeout(() => {
+    hasFirebase = !!(window.__BOTE_FIREBASE && window.__BOTE_FIREBASE.db);
+    db = hasFirebase ? window.__BOTE_FIREBASE.db : null;
+    auth = hasFirebase ? window.__BOTE_FIREBASE.auth : null;
+    
+    console.log('Firebase detectado:', hasFirebase);
+    
+    // Actualizar estado de conexión
+    const statusEl = document.getElementById('room-status');
+    if (statusEl) {
+      statusEl.textContent = hasFirebase ? 'Conectado (Firebase)' : 'Modo local';
+      statusEl.className = hasFirebase ? 'room-status connected' : 'room-status local';
+    }
+    
+    // Inicializar la app
+    if (hasFirebase) {
+      initFirebase();
+    } else {
+      initLocal();
+    }
+  }, 1000);
+
+  // Room management
+  function getRoomId(){
+    const params = new URLSearchParams(location.search);
+    const p = params.get('room');
+    if (p && p.trim()) return p.trim();
+    
+    const s = localStorage.getItem('bote_room');
+    if (s) return s;
+    
+    const newR = 'room-'+Math.random().toString(36).slice(2,8);
+    localStorage.setItem('bote_room', newR);
+    showToastMini(`Sala creada: ${newR}`, 4000);
+    console.info('Nueva sala creada:', newR);
+    return newR;
+  }
+  
+  const ROOM_ID = getRoomId();
+  document.title = `BoteComun — ${ROOM_ID}`;
+  
+  // Actualizar enlace de sala
+  setTimeout(() => {
+    const ru = `${location.origin}${location.pathname}?room=${ROOM_ID}`;
+    const el = document.getElementById('room-url');
+    if (el) {
+      el.href = ru;
+      el.textContent = ru;
+    }
+  }, 100);
+
+  // Utilities
+  function uid(prefix='t'){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+  function money(n){ return Number(n||0).toFixed(2) + ' €'; }
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+  // Toast functions
+  let toastTimer = null;
+  function showToastMini(message, ms=3000) {
+    console.log('Toast:', message);
+    if (!notifyEl) return;
+    notifyEl.textContent = message;
+    notifyEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> notifyEl.classList.remove('show'), ms);
+  }
+
+  // Center modal
+  let acceptHandler = null, cancelHandler = null;
+  function showCenterModal({ title='Aviso', message='', onAccept=null, onCancel=null, acceptText='Aceptar', cancelText='Cancelar' }={}) {
+    if (!cOverlay) { 
+      alert(message); 
+      if (onCancel) onCancel(); 
+      return; 
+    }
+    
+    if (cTitle) cTitle.textContent = title;
+    if (cMsg) cMsg.textContent = message;
+    if (cBtnAccept) cBtnAccept.textContent = acceptText;
+    if (cBtnCancel) cBtnCancel.textContent = cancelText;
+    
+    acceptHandler = onAccept;
+    cancelHandler = onCancel;
+    cOverlay.classList.add('show');
+    cOverlay.setAttribute('aria-hidden','false');
+    
+    setTimeout(()=> {
+      if (cBtnAccept) cBtnAccept.focus();
+    }, 10);
+  }
+  
+  function hideCenterModal(){
+    if (!cOverlay) return;
+    cOverlay.classList.remove('show');
+    cOverlay.setAttribute('aria-hidden','true');
+    acceptHandler = cancelHandler = null;
+  }
+
+  // Render function
+  function render(){
+    console.log('Renderizando estado:', state);
+    
+    // Calculate totals from transactions array
+    const transactions = state.transactions || [];
+    let totalAdded = 0;
+    let totalPaid = 0;
+    
+    transactions.forEach(tx => {
+      const amount = Number(tx.amount) || 0;
+      if (tx.type === 'add') {
+        totalAdded += amount;
+      } else if (tx.type === 'pay') {
+        totalPaid += amount;
+      }
+    });
+    
+    // Update state totals
+    state.totals.added = Number(totalAdded.toFixed(2));
+    state.totals.paid = Number(totalPaid.toFixed(2));
+    state.totals.balance = Number((totalAdded - totalPaid).toFixed(2));
+    
+    // Update UI
+    if (statAdded) statAdded.textContent = money(state.totals.added);
+    if (statPaid) statPaid.textContent = money(state.totals.paid);
+    if (statBalance) statBalance.textContent = money(state.totals.balance);
+
+    // Render transaction list
+    if (txList) {
+      txList.innerHTML = '';
+      transactions.slice().reverse().forEach(tx => {
+        const li = document.createElement('li');
+        li.className = 'tx-item';
+        li.innerHTML = `
+          <div class="tx-left">
+            <div class="badge ${tx.type === 'add' ? 'add' : 'pay'}">${tx.type === 'add' ? '+' : '−'}</div>
+            <div>
+              <div><strong>${escapeHtml(tx.name)}</strong> · ${money(tx.amount)} ${tx.place ? '· '+escapeHtml(tx.place) : ''}</div>
+              <div class="muted">${new Date(tx.createdAt).toLocaleString()}</div>
+            </div>
+          </div>
+          <div><button class="btn ghost btn-delete" data-id="${tx.id}" type="button">Eliminar</button></div>
+        `;
+        txList.appendChild(li);
+      });
+    }
+  }
+
+  // Local storage functions
+  function loadLocal(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      state = raw ? JSON.parse(raw) : { transactions:[], totals:{added:0,paid:0,balance:0} };
+      console.log('Estado cargado desde localStorage:', state);
+    } catch(e){
+      console.error('Error loading from localStorage:', e);
+      state = { transactions:[], totals:{added:0,paid:0,balance:0} };
+    }
+  }
+  
+  function saveLocal(){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      console.log('Estado guardado en localStorage');
+    } catch(e){
+      console.error('Error saving to localStorage:', e);
+    }
+  }
+
+  // Firebase functions
+  let unsubTxs = null;
+  
+  function subscribeToRoom(roomId){
+    if (!db) return;
+    const roomRef = db.collection('rooms').doc(roomId);
+    
+    console.log('Suscribiéndose a sala:', roomId);
+    
+    // Subscribe to transactions
+    unsubTxs = roomRef.collection('transactions').orderBy('createdAt','asc').onSnapshot(snap => {
+      const arr = [];
+      snap.forEach(d => arr.push(d.data()));
+      state.transactions = arr;
+      console.log('Transacciones actualizadas desde Firebase:', arr);
+      render();
+    }, err => console.error('Transactions snapshot error:', err));
+  }
+
+  async function addTxFirestore(tx){
+    if (!db) return;
+    const roomRef = db.collection('rooms').doc(ROOM_ID);
+    const txRef = roomRef.collection('transactions').doc(tx.id);
+    
+    try {
+      await txRef.set(tx);
+      console.log('Transaction added to Firestore:', tx);
+    } catch(e){
+      console.error('Error adding transaction:', e);
+      showToastMini('Error guardando en Firestore', 2500);
+    }
+  }
+
+  async function deleteTxFirestore(txId){
+    if (!db) return;
+    const roomRef = db.collection('rooms').doc(ROOM_ID);
+    const txRef = roomRef.collection('transactions').doc(txId);
+    
+    try {
+      await txRef.delete();
+      console.log('Transaction deleted from Firestore:', txId);
+    } catch(e){
+      console.error('Error deleting transaction:', e);
+      showToastMini('Error eliminando de Firestore', 2500);
+    }
+  }
+
+  async function resetRoomFirestore(){
+    if (!db) return;
+    const roomRef = db.collection('rooms').doc(ROOM_ID);
+    
+    try {
+      const snap = await roomRef.collection('transactions').get();
+      const batch = db.batch();
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      console.log('Room reset in Firestore');
+    } catch(e){
+      console.error('Error resetting room:', e);
+      showToastMini('Error reseteando en Firestore', 2500);
+    }
+  }
+
+  // Event listeners setup
+  function setupEventListeners() {
+    console.log('Configurando event listeners');
+    
+    // Botón copiar enlace
+    const copyBtn = document.getElementById('copy-room');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', ()=> {
+        const u = `${location.origin}${location.pathname}?room=${ROOM_ID}`;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(u).then(()=>showToastMini('Enlace copiado',1500)).catch(()=>{
+            // Fallback
+            const ta = document.createElement('textarea');
+            ta.value = u;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToastMini('Enlace copiado',1500);
+          });
+        } else {
+          // Fallback para navegadores antiguos
+          const ta = document.createElement('textarea');
+          ta.value = u;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+          showToastMini('Enlace copiado',1500);
+        }
+      });
+    }
+
+    // Botones principales
+    if (btnAdd) {
+      btnAdd.addEventListener('click', (e) => {
+        console.log('Botón Añadir clickeado');
+        e.preventDefault();
+        inputType.value = 'add';
+        submitForm();
+      });
+    }
+
+    if (btnPay) {
+      btnPay.addEventListener('click', (e) => {
+        console.log('Botón Pagar clickeado');
+        e.preventDefault();
+        inputType.value = 'pay';
+        submitForm();
+      });
+    }
+
+    if (btnQuick5) {
+      btnQuick5.addEventListener('click', (e) => {
+        e.preventDefault();
+        const current = parseFloat(inputAmount.value || 0) || 0;
+        inputAmount.value = (current + 5).toFixed(2);
+        inputAmount.focus();
+      });
+    }
+
+    if (btnQuick10) {
+      btnQuick10.addEventListener('click', (e) => {
+        e.preventDefault();
+        const current = parseFloat(inputAmount.value || 0) || 0;
+        inputAmount.value = (current + 10).toFixed(2);
+        inputAmount.focus();
+      });
+    }
+
+    // Form submission
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitForm();
+      });
+    }
+
+    // Center modal event listeners
+    if (cBtnAccept) {
+      cBtnAccept.addEventListener('click', ()=> {
+        if (acceptHandler) acceptHandler();
+        hideCenterModal();
+      });
+    }
+    
+    if (cBtnCancel) {
+      cBtnCancel.addEventListener('click', ()=> {
+        if (cancelHandler) cancelHandler();
+        hideCenterModal();
+      });
+    }
+
+    // Delete transaction (delegated)
+    if (txList) {
+      txList.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-delete');
+        if (!btn) return;
+        
+        const id = btn.dataset.id;
+        if (!confirm('¿Eliminar este movimiento?')) return;
+        
+        if (hasFirebase) {
+          await deleteTxFirestore(id);
+          showToastMini('Movimiento eliminado', 1400);
+        } else {
+          loadLocal();
+          const idx = state.transactions.findIndex(t => t.id === id);
+          if (idx > -1) {
+            state.transactions.splice(idx, 1);
+            saveLocal();
+            render();
+            showToastMini('Movimiento eliminado', 1400);
+          }
+        }
+      });
+    }
+
+    // Reset functionality
+    if (btnReset) {
+      btnReset.addEventListener('click', ()=> {
+        if (!toastOverlay) return;
+        toastOverlay.classList.add('show');
+        toastOverlay.setAttribute('aria-hidden','false');
+        if (toastConfirm) toastConfirm.focus();
+      });
+    }
+
+    if (toastCancel) {
+      toastCancel.addEventListener('click', ()=> {
+        if (!toastOverlay) return;
+        toastOverlay.classList.remove('show');
+        toastOverlay.setAttribute('aria-hidden','true');
+      });
+    }
+
+    if (toastConfirm) {
+      toastConfirm.addEventListener('click', async ()=> {
+        if (hasFirebase) {
+          await resetRoomFirestore();
+          showToastMini('Sala reseteada', 1500);
+        } else {
+          state.transactions = [];
+          state.totals = {added:0, paid:0, balance:0};
+          saveLocal();
+          render();
+          showToastMini('Bote reseteado', 1500);
+        }
+        
+        if (toastOverlay) {
+          toastOverlay.classList.remove('show');
+          toastOverlay.setAttribute('aria-hidden','true');
+        }
+      });
+    }
+
+    // Escape key handling
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        hideCenterModal();
+        if (toastOverlay && toastOverlay.classList.contains('show')) {
+          toastOverlay.classList.remove('show');
+          toastOverlay.setAttribute('aria-hidden','true');
+        }
+      }
+    });
+  }
+
+  // Form submission function
+  async function submitForm() {
+    console.log('Enviando formulario');
+    
+    const name = (inputName.value || 'Anon').trim();
+    const place = (inputPlace.value || '').trim();
+    const amount = parseFloat(inputAmount.value);
+    const type = inputType.value || 'add';
+    
+    if (!name || !amount || amount <= 0) {
+      showCenterModal({
+        title:'Datos incompletos',
+        message:'Introduce nombre y cantidad válida mayor que 0.'
+      });
+      return;
+    }
+    
+    // Check balance for payments
+    if (type === 'pay') {
+      const balance = Number(state.totals.balance || 0);
+      if (amount > balance) {
+        const deficit = Number((amount - balance).toFixed(2));
+        showCenterModal({
+          title: 'Saldo insuficiente',
+          message: `Faltan ${deficit.toFixed(2)} € para cubrir este pago.`,
+          acceptText: 'Añadir dinero',
+          cancelText: 'Cancelar',
+          onAccept: () => {
+            inputType.value = 'add';
+            inputAmount.value = deficit.toFixed(2);
+            inputAmount.focus();
+            inputAmount.select();
+          }
+        });
+        return;
+      }
+    }
+    
+    const tx = {
+      id: uid(),
+      name,
+      place,
+      amount: Number(amount.toFixed(2)),
+      type,
+      createdAt: Date.now()
+    };
+    
+    console.log('Nueva transacción:', tx);
+    
+    if (hasFirebase) {
+      await addTxFirestore(tx);
+      form.reset();
+      inputType.value = 'add';
+      inputName.focus();
+      showToastMini(type === 'add' ? 'Aportación enviada' : 'Pago enviado', 1600);
+    } else {
+      // Local mode
+      loadLocal();
+      state.transactions.push(tx);
+      saveLocal();
+      render();
+      form.reset();
+      inputType.value = 'add';
+      inputName.focus();
+      showToastMini(type === 'add' ? 'Aportación añadida' : 'Pago registrado', 1600);
+    }
+  }
+
+  // Initialization functions
+  function initLocal() {
+    console.log('Inicializando modo local');
+    loadLocal();
+    render();
+    
+    // Listen for storage changes (multi-tab sync)
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEY) {
+        loadLocal();
+        render();
+      }
+    });
+  }
+
+  function initFirebase() {
+    console.log('Inicializando modo Firebase');
+    
+    if (auth && auth.currentUser === null) {
+      auth.signInAnonymously().catch(err => console.warn('Auth error:', err));
+    }
+    
+    subscribeToRoom(ROOM_ID);
+    showToastMini('Conectado a sala: ' + ROOM_ID, 2000);
+    console.info('Suscrito a sala Firebase:', ROOM_ID);
+  }
+
+  // Setup event listeners immediately
+  setupEventListeners();
+  
+  console.log('BoteComun JS inicializado completamente');
+});

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BoteComun</title>
+  <link rel="stylesheet" href="boteComun.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a84ff">
+</head>
+<body>
+  <header class="app-header">
+    <h1>BoteComun</h1>
+    <p id="room-link">Sala: <a id="room-url" href="#" target="_blank" rel="noopener">Compartir sala</a></p>
+    <button id="copy-room" class="btn">Copiar enlace</button>
+    <p id="room-status" class="room-status">Conectando...</p>
+    <p class="tagline">Controla  y pagos del bote común</p>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <h2>Registrar</h2>
+      <form id="entry-form" class="form" autocomplete="off">
+        <input id="input-type" type="hidden" value="add" />
+        <div class="row">
+          <label>Nombre
+            <input id="input-name" placeholder="Tu apodo" required>
+          </label>
+          <label>Lugar
+            <input id="input-place" placeholder="Bar, local... (opcional)">
+          </label>
+        </div>
+        <div class="row">
+          <label>Cantidad (€)
+            <input id="input-amount" type="number" step="0.01" min="0.01" placeholder="12.50" required>
+          </label>
+        </div>
+        <div class="row actions-row">
+          <button type="button" id="btn-add" class="btn add-strong">Añadir Dinero</button>
+          <button type="button" id="btn-pay" class="btn pay-strong">Pagar</button>
+          <button type="button" id="btn-quick-5" class="btn">+5€</button>
+          <button type="button" id="btn-quick-10" class="btn">+10€</button>
+          <button type="button" id="btn-reset" class="btn warn">Resetear todo</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel stats-panel">
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-label">Total aportado</div>
+          <div id="stat-added" class="stat-value">0.00 €</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total pagado</div>
+          <div id="stat-paid" class="stat-value">0.00 €</div>
+        </div>
+        <div class="stat-card balance">
+          <div class="stat-label">Saldo actual</div>
+          <div id="stat-balance" class="stat-value">0.00 €</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Movimientos recientes</h2>
+      <ul id="tx-list" class="tx-list"></ul>
+    </section>
+  </main>
+
+  <div id="toast-overlay" class="toast-overlay" aria-hidden="true">
+    <div class="toast-card" role="dialog" aria-modal="true" aria-labelledby="toast-title">
+      <h3 id="toast-title">Confirmar reset</h3>
+      <p id="toast-msg">Vas a resetear todo el bote. ¿Deseas continuar?</p>
+      <div class="toast-actions">
+        <button id="toast-cancel" type="button" class="btn">Cancelar</button>
+        <button id="toast-confirm" type="button" class="btn warn">Resetear</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="center-toast" class="center-toast" aria-hidden="true">
+    <div class="center-toast-card red-alert" role="dialog" aria-modal="true" aria-labelledby="center-toast-title">
+      <h3 id="center-toast-title">Aviso</h3>
+      <p id="center-toast-msg">Mensaje</p>
+      <div class="center-toast-actions">
+        <button id="center-toast-cancel" type="button" class="btn strong-cancel">Cancelar</button>
+        <button id="center-toast-accept" type="button" class="btn strong-accept">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notify" class="toast-mini" role="status" aria-live="polite"></div>
+
+  <footer class="app-footer">
+    <p class="footer-text">Bote en Comun para los Amigos</p>
+  </footer>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ",
+      authDomain: "botecomun-aaa5c.firebaseapp.com",
+      projectId: "botecomun-aaa5c",
+      storageBucket: "botecomun-aaa5c.appspot.com",
+      messagingSenderId: "123456789012",
+      appId: "1:123456789012:web:abcdefghijklmnop"
+    };
+    
+    if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.projectId !== "TU_PROYECTO") {
+      try {
+        firebase.initializeApp(firebaseConfig);
+        window.__BOTE_FIREBASE = { db: firebase.firestore(), auth: firebase.auth() };
+        firebase.auth().signInAnonymously().catch(()=>{});
+      } catch(e){ console.warn('Firebase init error', e); }
+    }
+  </script>
+
+  <script src="boteComun.js" defer></script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+      });
+    }
+  </script>
+</body>
+</html>
