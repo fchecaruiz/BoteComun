@@ -32,21 +32,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const cBtnAccept = document.getElementById('center-toast-accept');
   const notifyEl = document.getElementById('notify');
 
-  // Verificar elementos críticos
   if (!form || !btnAdd || !btnPay) {
     console.error('Elementos críticos no encontrados');
     return;
   }
 
-  // State
   let state = { transactions: [], totals: { added: 0, paid: 0, balance: 0 } };
 
-  // Firebase detection (con timeout)
   let hasFirebase = false;
   let db = null;
   let auth = null;
   
-  // Esperar un poco para que Firebase se inicialice
   setTimeout(() => {
     hasFirebase = !!(window.__BOTE_FIREBASE && window.__BOTE_FIREBASE.db);
     db = hasFirebase ? window.__BOTE_FIREBASE.db : null;
@@ -54,14 +50,12 @@ document.addEventListener('DOMContentLoaded', () => {
     
     console.log('Firebase detectado:', hasFirebase);
     
-    // Actualizar estado de conexión
     const statusEl = document.getElementById('room-status');
     if (statusEl) {
       statusEl.textContent = hasFirebase ? 'Conectado (Firebase)' : 'Modo local';
       statusEl.className = hasFirebase ? 'room-status connected' : 'room-status local';
     }
     
-    // Inicializar la app
     if (hasFirebase) {
       initFirebase();
     } else {
@@ -69,7 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, 1000);
 
-  // Room management
   function getRoomId(){
     const params = new URLSearchParams(location.search);
     const p = params.get('room');
@@ -88,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const ROOM_ID = getRoomId();
   document.title = `BoteComun — ${ROOM_ID}`;
   
-  // Actualizar enlace de sala
   setTimeout(() => {
     const ru = `${location.origin}${location.pathname}?room=${ROOM_ID}`;
     const el = document.getElementById('room-url');
@@ -98,12 +90,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, 100);
 
-  // Utilities
   function uid(prefix='t'){ return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
   function money(n){ return Number(n||0).toFixed(2) + ' €'; }
   function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
-  // Toast functions
   let toastTimer = null;
   function showToastMini(message, ms=3000) {
     console.log('Toast:', message);
@@ -114,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
     toastTimer = setTimeout(()=> notifyEl.classList.remove('show'), ms);
   }
 
-  // Center modal
   let acceptHandler = null, cancelHandler = null;
   function showCenterModal({ title='Aviso', message='', onAccept=null, onCancel=null, acceptText='Aceptar', cancelText='Cancelar' }={}) {
     if (!cOverlay) { 
@@ -145,11 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
     acceptHandler = cancelHandler = null;
   }
 
-  // Render function
   function render(){
-    console.log('Renderizando estado:', state);
-    
-    // Calculate totals from transactions array
     const transactions = state.transactions || [];
     let totalAdded = 0;
     let totalPaid = 0;
@@ -163,28 +148,26 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
     
-    // Update state totals
     state.totals.added = Number(totalAdded.toFixed(2));
     state.totals.paid = Number(totalPaid.toFixed(2));
     state.totals.balance = Number((totalAdded - totalPaid).toFixed(2));
     
-    // Update UI
     if (statAdded) statAdded.textContent = money(state.totals.added);
     if (statPaid) statPaid.textContent = money(state.totals.paid);
     if (statBalance) statBalance.textContent = money(state.totals.balance);
 
-    // Render transaction list
     if (txList) {
       txList.innerHTML = '';
       transactions.slice().reverse().forEach(tx => {
         const li = document.createElement('li');
         li.className = 'tx-item';
+        const created = tx.createdAt && tx.createdAt.toDate ? tx.createdAt.toDate() : new Date(tx.createdAt);
         li.innerHTML = `
           <div class="tx-left">
             <div class="badge ${tx.type === 'add' ? 'add' : 'pay'}">${tx.type === 'add' ? '+' : '−'}</div>
             <div>
               <div><strong>${escapeHtml(tx.name)}</strong> · ${money(tx.amount)} ${tx.place ? '· '+escapeHtml(tx.place) : ''}</div>
-              <div class="muted">${new Date(tx.createdAt).toLocaleString()}</div>
+              <div class="muted">${created.toLocaleString()}</div>
             </div>
           </div>
           <div><button class="btn ghost btn-delete" data-id="${tx.id}" type="button">Eliminar</button></div>
@@ -194,14 +177,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Local storage functions
   function loadLocal(){
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       state = raw ? JSON.parse(raw) : { transactions:[], totals:{added:0,paid:0,balance:0} };
-      console.log('Estado cargado desde localStorage:', state);
     } catch(e){
-      console.error('Error loading from localStorage:', e);
       state = { transactions:[], totals:{added:0,paid:0,balance:0} };
     }
   }
@@ -209,27 +189,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function saveLocal(){
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      console.log('Estado guardado en localStorage');
-    } catch(e){
-      console.error('Error saving to localStorage:', e);
-    }
+    } catch(e){}
   }
 
-  // Firebase functions
   let unsubTxs = null;
   
   function subscribeToRoom(roomId){
     if (!db) return;
     const roomRef = db.collection('rooms').doc(roomId);
     
-    console.log('Suscribiéndose a sala:', roomId);
-    
-    // Subscribe to transactions
     unsubTxs = roomRef.collection('transactions').orderBy('createdAt','asc').onSnapshot(snap => {
       const arr = [];
       snap.forEach(d => arr.push(d.data()));
       state.transactions = arr;
-      console.log('Transacciones actualizadas desde Firebase:', arr);
       render();
     }, err => console.error('Transactions snapshot error:', err));
   }
@@ -241,9 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     try {
       await txRef.set(tx);
-      console.log('Transaction added to Firestore:', tx);
     } catch(e){
-      console.error('Error adding transaction:', e);
       showToastMini('Error guardando en Firestore', 2500);
     }
   }
@@ -252,12 +222,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!db) return;
     const roomRef = db.collection('rooms').doc(ROOM_ID);
     const txRef = roomRef.collection('transactions').doc(txId);
-    
     try {
       await txRef.delete();
-      console.log('Transaction deleted from Firestore:', txId);
     } catch(e){
-      console.error('Error deleting transaction:', e);
       showToastMini('Error eliminando de Firestore', 2500);
     }
   }
@@ -265,56 +232,29 @@ document.addEventListener('DOMContentLoaded', () => {
   async function resetRoomFirestore(){
     if (!db) return;
     const roomRef = db.collection('rooms').doc(ROOM_ID);
-    
     try {
       const snap = await roomRef.collection('transactions').get();
       const batch = db.batch();
       snap.forEach(d => batch.delete(d.ref));
       await batch.commit();
-      console.log('Room reset in Firestore');
     } catch(e){
-      console.error('Error resetting room:', e);
       showToastMini('Error reseteando en Firestore', 2500);
     }
   }
 
-  // Event listeners setup
   function setupEventListeners() {
-    console.log('Configurando event listeners');
-    
-    // Botón copiar enlace
     const copyBtn = document.getElementById('copy-room');
     if (copyBtn) {
       copyBtn.addEventListener('click', ()=> {
         const u = `${location.origin}${location.pathname}?room=${ROOM_ID}`;
         if (navigator.clipboard) {
-          navigator.clipboard.writeText(u).then(()=>showToastMini('Enlace copiado',1500)).catch(()=>{
-            // Fallback
-            const ta = document.createElement('textarea');
-            ta.value = u;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            document.body.removeChild(ta);
-            showToastMini('Enlace copiado',1500);
-          });
-        } else {
-          // Fallback para navegadores antiguos
-          const ta = document.createElement('textarea');
-          ta.value = u;
-          document.body.appendChild(ta);
-          ta.select();
-          document.execCommand('copy');
-          document.body.removeChild(ta);
-          showToastMini('Enlace copiado',1500);
+          navigator.clipboard.writeText(u).then(()=>showToastMini('Enlace copiado',1500)).catch(()=>{});
         }
       });
     }
 
-    // Botones principales
     if (btnAdd) {
       btnAdd.addEventListener('click', (e) => {
-        console.log('Botón Añadir clickeado');
         e.preventDefault();
         inputType.value = 'add';
         submitForm();
@@ -323,7 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnPay) {
       btnPay.addEventListener('click', (e) => {
-        console.log('Botón Pagar clickeado');
         e.preventDefault();
         inputType.value = 'pay';
         submitForm();
@@ -348,7 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Form submission
     if (form) {
       form.addEventListener('submit', (e) => {
         e.preventDefault();
@@ -356,7 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Center modal event listeners
     if (cBtnAccept) {
       cBtnAccept.addEventListener('click', ()=> {
         if (acceptHandler) acceptHandler();
@@ -371,15 +308,12 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Delete transaction (delegated)
     if (txList) {
       txList.addEventListener('click', async (e) => {
         const btn = e.target.closest('.btn-delete');
         if (!btn) return;
-        
         const id = btn.dataset.id;
         if (!confirm('¿Eliminar este movimiento?')) return;
-        
         if (hasFirebase) {
           await deleteTxFirestore(id);
           showToastMini('Movimiento eliminado', 1400);
@@ -396,7 +330,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Reset functionality
     if (btnReset) {
       btnReset.addEventListener('click', ()=> {
         if (!toastOverlay) return;
@@ -434,7 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Escape key handling
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         hideCenterModal();
@@ -446,10 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Form submission function
   async function submitForm() {
-    console.log('Enviando formulario');
-    
     const name = (inputName.value || 'Anon').trim();
     const place = (inputPlace.value || '').trim();
     const amount = parseFloat(inputAmount.value);
@@ -463,7 +392,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    // Check balance for payments
     if (type === 'pay') {
       const balance = Number(state.totals.balance || 0);
       if (amount > balance) {
@@ -490,10 +418,8 @@ document.addEventListener('DOMContentLoaded', () => {
       place,
       amount: Number(amount.toFixed(2)),
       type,
-      createdAt: Date.now()
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    
-    console.log('Nueva transacción:', tx);
     
     if (hasFirebase) {
       await addTxFirestore(tx);
@@ -502,9 +428,8 @@ document.addEventListener('DOMContentLoaded', () => {
       inputName.focus();
       showToastMini(type === 'add' ? 'Aportación enviada' : 'Pago enviado', 1600);
     } else {
-      // Local mode
       loadLocal();
-      state.transactions.push(tx);
+      state.transactions.push({...tx, createdAt: Date.now()});
       saveLocal();
       render();
       form.reset();
@@ -514,13 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Initialization functions
   function initLocal() {
-    console.log('Inicializando modo local');
     loadLocal();
     render();
-    
-    // Listen for storage changes (multi-tab sync)
     window.addEventListener('storage', (e) => {
       if (e.key === STORAGE_KEY) {
         loadLocal();
@@ -530,18 +451,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function initFirebase() {
-    console.log('Inicializando modo Firebase');
-    
     if (auth && auth.currentUser === null) {
       auth.signInAnonymously().catch(err => console.warn('Auth error:', err));
     }
-    
     subscribeToRoom(ROOM_ID);
     showToastMini('Conectado a sala: ' + ROOM_ID, 2000);
-    console.info('Suscrito a sala Firebase:', ROOM_ID);
   }
 
-  // Setup event listeners immediately
   setupEventListeners();
   
   console.log('BoteComun JS inicializado completamente');
