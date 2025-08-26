@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>BoteComun</title>
   <link rel="stylesheet" href="boteComun.css">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0a84ff">
 </head>
 <body>
@@ -14,7 +14,7 @@
     <p id="room-link">Sala: <a id="room-url" href="#" target="_blank" rel="noopener">Compartir sala</a></p>
     <button id="copy-room" class="btn">Copiar enlace</button>
     <p id="room-status" class="room-status">Conectando...</p>
-    <p class="tagline">Controla  y pagos del bote común</p>
+    <p class="tagline">Controla aportes y pagos del bote común</p>
   </header>
 
   <main class="container">
@@ -96,26 +96,38 @@
     <p class="footer-text">Bote en Comun para los Amigos</p>
   </footer>
 
+  <!-- Firebase Scripts -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <script>
+    // Tu configuración Firebase real
     const firebaseConfig = {
-      apiKey: "AIzaSyBJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJJ",
+      apiKey: "AIzaSyBdjDf3gq__Luy-yqaq06B4EnM2MvrbUd0",
       authDomain: "botecomun-aaa5c.firebaseapp.com",
       projectId: "botecomun-aaa5c",
-      storageBucket: "botecomun-aaa5c.appspot.com",
-      messagingSenderId: "123456789012",
-      appId: "1:123456789012:web:abcdefghijklmnop"
+      storageBucket: "botecomun-aaa5c.firebasestorage.app",
+      messagingSenderId: "410248194999",
+      appId: "1:410248194999:web:9cc52ea249fd7b65c3d632",
+      measurementId: "G-QZDZCEPD7E"
     };
-    
-    if (firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.projectId !== "TU_PROYECTO") {
-      try {
-        firebase.initializeApp(firebaseConfig);
-        window.__BOTE_FIREBASE = { db: firebase.firestore(), auth: firebase.auth() };
-        firebase.auth().signInAnonymously().catch(()=>{});
-      } catch(e){ console.warn('Firebase init error', e); }
+
+    try {
+      firebase.initializeApp(firebaseConfig);
+      window.__BOTE_FIREBASE = { db: firebase.firestore(), auth: firebase.auth() };
+      
+      firebase.auth().signInAnonymously().catch(err => {
+        const statusEl = document.getElementById('room-status');
+        if (statusEl) statusEl.textContent = 'Auth error: ' + err.code;
+        console.error('Auth error:', err);
+      });
+      
+      console.log('Firebase inicializado correctamente');
+    } catch(e) {
+      const statusEl = document.getElementById('room-status');
+      if (statusEl) statusEl.textContent = 'Error Firebase';
+      console.error('Firebase init error:', e);
     }
   </script>
 
@@ -124,7 +136,7 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/service-worker.js').catch(()=>{});
+        navigator.serviceWorker.register('service-worker.js').catch(()=>{});
       });
     }
   </script>
