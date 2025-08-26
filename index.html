@@ -2,31 +2,32 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,maximum-scale=1" />
   <title>BoteComun</title>
   <link rel="stylesheet" href="boteComun.css">
-  <meta name="theme-color" content="#0a84ff">
+  <meta name="theme-color" content="#0b1026">
 </head>
 <body>
   <header class="app-header">
     <h1>BoteComun</h1>
 
     <div class="room-controls">
-      <input id="bote-name" class="bote-name-input" type="text" placeholder="Nombre del bote (p.ej. 2025-09-01 · Cena viernes)" />
+      <input id="bote-name" class="bote-name-input light" type="text" placeholder="Nombre del bote (p.ej. Cena viernes)" />
       <button id="new-room" class="btn success" type="button">Nuevo Bote</button>
       <button id="delete-room" class="btn warn" type="button">Eliminar Bote</button>
-      <button id="copy-room" class="btn" type="button">Copiar enlace</button>
+      <button id="copy-room" class="btn ghost" type="button">Copiar enlace</button>
     </div>
 
     <div class="bote-selector">
       <label for="bote-selector" class="selector-label">Seleccionar bote</label>
-      <select id="bote-selector" class="selector-select">
+      <select id="bote-selector" class="selector-select light">
         <option value="">— Selecciona un bote —</option>
       </select>
     </div>
 
     <p class="current-bote">
-      Bote actual: <strong id="current-bote-name">Ninguno</strong>
+      Bote actual:
+      <strong id="current-bote-name" class="bote-name-chip">Ninguno</strong>
     </p>
 
     <p id="room-link">
@@ -38,7 +39,7 @@
   </header>
 
   <main class="container">
-    <section class="panel panel-disabled" id="register-panel">
+    <section class="panel panel-register-yellow panel-disabled" id="register-panel">
       <h2>Registrar</h2>
       <div class="panel-overlay" id="panel-overlay">
         <div class="overlay-message">
@@ -58,14 +59,28 @@
         </div>
         <div class="row">
           <label class="flex">Cantidad (€)
-            <input id="input-amount" type="number" step="0.01" min="0.01" placeholder="12.50" required>
+            <input id="input-amount" type="number" step="0.01" min="0.01" placeholder="0.00" required>
+          </label>
+          <label class="flex">Método de pago
+            <select id="input-method">
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta_debito">Tarjeta Débito</option>
+              <option value="tarjeta_credito">Tarjeta Crédito</option>
+              <option value="bizum">Bizum</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="paypal">PayPal</option>
+              <option value="revolut">Revolut</option>
+              <option value="apple_pay">Apple Pay</option>
+              <option value="google_pay">Google Pay</option>
+              <option value="otro">Otro</option>
+            </select>
           </label>
         </div>
         <div class="row actions-row">
           <button type="button" id="btn-add" class="btn add-strong">Añadir Dinero</button>
           <button type="button" id="btn-pay" class="btn pay-strong">Pagar</button>
-          <button type="button" id="btn-quick-5" class="btn">+5€</button>
-          <button type="button" id="btn-quick-10" class="btn">+10€</button>
+          <button type="button" id="btn-quick-5" class="btn ghost">+5€</button>
+          <button type="button" id="btn-quick-10" class="btn ghost">+10€</button>
           <button type="button" id="btn-reset" class="btn warn">Resetear todo</button>
         </div>
       </form>
@@ -77,7 +92,7 @@
           <div class="stat-label">Total aportado</div>
           <div id="stat-added" class="stat-value">0.00 €</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card1">
           <div class="stat-label">Total pagado</div>
           <div id="stat-paid" class="stat-value">0.00 €</div>
         </div>
@@ -130,7 +145,6 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // Configuración real de tu proyecto
     const firebaseConfig = {
       apiKey: "AIzaSyBdjDf3gq__Luy-yqaq06B4EnM2MvrbUd0",
       authDomain: "botecomun-aaa5c.firebaseapp.com",
@@ -148,7 +162,6 @@
         if (statusEl) statusEl.textContent = 'Auth error: ' + err.code;
         console.error('Auth error:', err);
       });
-      console.log('Firebase inicializado correctamente');
     } catch(e) {
       const statusEl = document.getElementById('room-status');
       if (statusEl) statusEl.textContent = 'Error Firebase';

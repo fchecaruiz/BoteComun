@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputName = document.getElementById('input-name');
   const inputPlace = document.getElementById('input-place');
   const inputAmount = document.getElementById('input-amount');
+  const inputMethod = document.getElementById('input-method');
   const inputType = document.getElementById('input-type');
   const btnAdd = document.getElementById('btn-add');
   const btnPay = document.getElementById('btn-pay');
@@ -55,14 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
   let unsubTxs = null;
   let unsubRooms = null;
 
-  // UI Control
+  // UI Control: bloquear/activar registrar según haya sala
   function setUIEnabled(enabled) {
     [btnAdd, btnPay, btnQuick5, btnQuick10, btnReset].forEach(b => {
       if (!b) return;
       b.disabled = !enabled;
       b.classList.toggle('disabled', !enabled);
     });
-    [inputName, inputPlace, inputAmount].forEach(input => {
+    [inputName, inputPlace, inputAmount, inputMethod].forEach(input => {
       if (!input) return;
       input.disabled = !enabled;
     });
@@ -76,12 +77,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   }
-  // Bloqueado por defecto
   setUIEnabled(false);
 
   // Toast
   let toastTimer = null;
-  function showToastMini(message, ms=2500) {
+  function showToastMini(message, ms=2600) {
     if (!notifyEl) return;
     notifyEl.textContent = message;
     notifyEl.classList.add('show');
@@ -116,6 +116,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(location.search);
     const p = params.get('room');
     return p && p.trim() ? p.trim() : null;
+  }
+  function humanMethod(val){
+    const map = {
+      efectivo: 'Efectivo',
+      tarjeta_debito: 'Tarjeta Débito',
+      tarjeta_credito: 'Tarjeta Crédito',
+      bizum: 'Bizum',
+      transferencia: 'Transferencia',
+      paypal: 'PayPal',
+      revolut: 'Revolut',
+      apple_pay: 'Apple Pay',
+      google_pay: 'Google Pay',
+      otro: 'Otro'
+    };
+    return map[val] || val || '—';
   }
 
   // Cabecera
@@ -162,12 +177,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const created = tx.createdAt && tx.createdAt.toDate ? tx.createdAt.toDate() :
                       (typeof tx.createdAt === 'number' ? new Date(tx.createdAt) : new Date());
       const place = tx.place && tx.place.trim() ? tx.place.trim() : '—';
-      const typeBadge = tx.type==='add' ? '+ Aporte' : '− Pago';
+      const method = tx.paymentMethod && tx.paymentMethod.trim() ? humanMethod(tx.paymentMethod.trim()) : '—';
+      const typeBadge = tx.type==='add' ? 'Aporte' : 'Pago';
+      
       li.innerHTML = `
         <div class="tx-left">
           <div class="badge ${tx.type==='add'?'add':'pay'}">${tx.type==='add'?'+':'−'}</div>
           <div>
-            <div><strong>${escapeHtml(tx.name)}</strong> · ${money(tx.amount)} · <span class="chip">${escapeHtml(typeBadge)}</span></div>
+            <div class="tx-headline">
+              <strong>${escapeHtml(tx.name)}</strong> · ${money(tx.amount)} 
+              <span class="chip ${tx.type==='add'?'chip-add':'chip-pay'}">${escapeHtml(typeBadge)}</span>
+              <span class="chip chip-method">${escapeHtml(method)}</span>
+            </div>
             <div class="muted">Lugar: <em>${escapeHtml(place)}</em> · ${created.toLocaleString()}</div>
           </div>
         </div>
@@ -193,7 +214,6 @@ document.addEventListener('DOMContentLoaded', () => {
     unsubRooms = db.collection('rooms').orderBy('createdAt','desc').onSnapshot(snap=>{
       ROOMS_CACHE.clear();
       if (selectBote) {
-        const current = selectBote.value;
         selectBote.innerHTML = `<option value="">— Selecciona un bote —</option>`;
         snap.forEach(doc=>{
           const data = doc.data() || {};
@@ -204,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
           opt.textContent = data.name || id;
           selectBote.appendChild(opt);
         });
-        // Mantener selección visible si está
         if (ROOM_ID) selectBote.value = ROOM_ID;
         else selectBote.value = '';
       }
@@ -227,7 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
         statusEl.textContent = 'Snapshot error: ' + (err.code || err.message);
         console.error('onSnapshot error:', err);
       });
-    // Obtener nombre del bote para cabecera
     roomRef.get().then(d=>{
       const data = d.data()||{};
       CURRENT_ROOM_NAME = data.name || roomId;
@@ -242,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!snap.exists) {
       await ref.set({ name: roomName || roomId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
     } else if (roomName) {
-      // Actualiza nombre si ha cambiado
       const data = snap.data()||{};
       if (data.name !== roomName) await ref.update({ name: roomName });
     }
@@ -281,8 +298,6 @@ document.addEventListener('DOMContentLoaded', () => {
       cancelText: 'Cancelar',
       onAccept: async () => {
         try {
-          // Si había sala y se desea eliminar datos previos, se purgan transacciones pero no es obligatorio borrarla
-          // Aquí no borramos automáticamente, solo cambiamos a una nueva
           const newRoomId = 'room-' + Math.random().toString(36).slice(2,8);
           const newUrl = `${location.origin}${location.pathname}?room=${newRoomId}`;
           window.history.pushState({}, '', newUrl);
@@ -290,13 +305,11 @@ document.addEventListener('DOMContentLoaded', () => {
           ROOM_ID = newRoomId;
           CURRENT_ROOM_NAME = name;
 
-          // Crear/asegurar doc de sala
           if (hasFirebase && isReady) {
             await ensureRoomDoc(ROOM_ID, name);
             subscribeToRoom(ROOM_ID);
           }
 
-          // Limpiar estado local y UI
           state = { transactions: [], totals: { added: 0, paid: 0, balance: 0 } };
           render();
           setUIEnabled(true);
@@ -335,7 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
           render();
           setUIEnabled(false);
 
-          // Quitar room de la URL
           window.history.pushState({}, '', location.pathname);
           updateHeaderWithRoom();
         } catch (error) {
@@ -353,6 +365,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const name = (inputName.value||'Anon').trim();
     const place = (inputPlace.value||'').trim();
     const amount = parseFloat(inputAmount.value);
+    const methodRaw = (inputMethod.value||'efectivo').trim();
+    const methodLabel = humanMethod(methodRaw);
     const type = inputType.value || 'add';
 
     if (!name || !amount || amount<=0){
@@ -375,7 +389,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tx = {
       id: uid(),
       name,
-      place: place || '', // se muestra como “—” si está vacío
+      place: place || '',
+      paymentMethod: methodRaw,
       amount: Number(amount.toFixed(2)),
       type,
       createdAt: hasFirebase ? firebase.firestore.FieldValue.serverTimestamp() : Date.now()
@@ -386,11 +401,11 @@ document.addEventListener('DOMContentLoaded', () => {
       try { await addTxFirestore(tx); }
       catch(err){ showToastMini('Error guardar: '+(err.code||''),1500); }
       form.reset(); inputType.value='add'; inputName.focus();
-      showToastMini(type==='add'?'Aportación enviada':'Pago enviado',1200);
+      showToastMini(`${type==='add'?'Aporte':'Pago'} por ${money(amount)} (${methodLabel})`,1800);
     } else {
       loadLocal(); state.transactions.push(tx); saveLocal(); render();
       form.reset(); inputType.value='add'; inputName.focus();
-      showToastMini(type==='add'?'Aportación añadida':'Pago registrado',1200);
+      showToastMini(`${type==='add'?'Aporte':'Pago'} por ${money(amount)} (${methodLabel})`,1800);
     }
   }
 
@@ -408,7 +423,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('new-room')?.addEventListener('click', createNewRoom);
     document.getElementById('delete-room')?.addEventListener('click', deleteCurrentRoom);
 
-    // Cambiar bote desde el selector
     selectBote?.addEventListener('change', async (e)=>{
       const id = e.target.value || null;
       if (!id){
@@ -427,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
       window.history.pushState({}, '', newUrl);
 
       if (hasFirebase && isReady){
-        await ensureRoomDoc(id, CURRENT_ROOM_NAME); // por si alguien creó a mano
+        await ensureRoomDoc(id, CURRENT_ROOM_NAME);
         subscribeToRoom(id);
       } else {
         loadLocal(); render();
@@ -492,12 +506,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function initFirebase(){
     statusEl && (statusEl.textContent='Conectando…', statusEl.className='room-status');
-    setUIEnabled(false); // bloqueo inicial
+    setUIEnabled(false);
     auth.onAuthStateChanged(async (user)=>{
       if (user){
         isReady = true;
         statusEl && (statusEl.textContent='Conectado (Firebase)', statusEl.className='room-status connected');
-        subscribeRoomsList(); // pobla el selector
+        subscribeRoomsList();
         if (ROOM_ID) {
           subscribeToRoom(ROOM_ID);
           setUIEnabled(true);
