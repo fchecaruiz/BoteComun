@@ -36,6 +36,42 @@ body {
 .app-header h1 { margin:0; font-size:1.3rem; }
 .tagline { margin:6px 0 0; font-size:.9rem; opacity:.95; }
 
+/* Room controls - Nueva sección para los botones de sala */
+.room-controls {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Campo de nombre del bote: mismo ancho que el selector */
+.bote-name-input {
+  width: 100%;
+  max-width: 520px;       /* igual que el selector */
+  flex: 0 1 520px;        /* no ocupar todo el ancho */
+  min-width: 240px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: var(--card);
+  color: var(--text);
+}
+
+/* Selector de botes */
+.bote-selector { margin: 6px 0 4px; }
+.selector-label { display:block; font-size:.9rem; color: rgba(255,255,255,.85); margin-bottom:4px; }
+.selector-select {
+  width: 100%;
+  max-width: 520px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 10px;
+}
+.current-bote { margin: 6px 0; font-weight: 600; }
+
 /* Container */
 .container {
   max-width: 1100px;
@@ -66,9 +102,56 @@ body {
 .btn {
   padding:10px 14px; border-radius:8px; border:none; cursor:pointer; background:yellowgreen; color:black;
   box-shadow: none;
+  font-weight: 600;
+  transition: all 0.2s ease;
 }
-.btn.warn { background:blue; color:#fbfbfb; font-weight:700; }
-.btn.ghost { background: rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); }
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Botones de sala específicos */
+.btn.success {
+  background: linear-gradient(180deg, var(--success), #0d9488);
+  color: white;
+  font-weight: 700;
+  border: 1px solid rgba(16,185,129,0.3);
+}
+
+.btn.success:hover {
+  background: linear-gradient(180deg, #0d9488, var(--success));
+  box-shadow: 0 4px 16px rgba(16,185,129,0.4);
+}
+
+.btn.warn {
+  background: linear-gradient(180deg, var(--danger), #dc2626);
+  color: white;
+  font-weight: 700;
+  border: 1px solid rgba(255,59,48,0.3);
+}
+
+.btn.warn:hover {
+  background: linear-gradient(180deg, #dc2626, var(--danger));
+  box-shadow: 0 4px 16px rgba(255,59,48,0.4);
+}
+
+.btn.ghost { 
+  background: rgba(255,255,255,0.02); 
+  border:1px solid rgba(255,255,255,0.03); 
+  color: var(--text);
+}
+
+.btn.ghost:hover {
+  background: rgba(255,255,255,0.05);
+  border-color: rgba(255,255,255,0.1);
+}
 
 /* Botones principales */
 .btn.add-strong {
@@ -76,10 +159,21 @@ body {
   color:white;
   font-weight: 800;
 }
+
+.btn.add-strong:hover {
+  background: linear-gradient(180deg,#0a84ff,#1f5eff);
+  box-shadow: 0 4px 16px rgba(10,132,255,0.4);
+}
+
 .btn.pay-strong {
   background: linear-gradient(180deg,#ff3b30,#d32f2f);
   color: #ffffff;
   font-weight: 800;
+}
+
+.btn.pay-strong:hover {
+  background: linear-gradient(180deg,#d32f2f,#ff3b30);
+  box-shadow: 0 4px 16px rgba(255,59,48,0.4);
 }
 
 /* Actions row */
@@ -109,7 +203,7 @@ body {
 .tx-left { display:flex; gap:12px; align-items:center; }
 .badge { padding:6px 8px; border-radius:8px; font-weight:700; color:white; min-width:36px; text-align:center; }
 .badge.add { background: var(--accent-2); }
-.badge.pay { background: var(--warn); color:#0f1724; }
+.badge.pay { background: var(--danger); color:#ffffff; }
 
 /* Footer (simplificado, sin enlaces) */
 .app-footer {
@@ -133,56 +227,98 @@ body {
 /* Modal centrado de aviso crítico */
 .center-toast {
   position: fixed; inset:0; display:none; align-items:center; justify-content:center;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0,0,0,0.85);
   z-index: 300;
+  backdrop-filter: blur(4px);
 }
-.toast-card{
-  font-size:1.3rem; margin:0 0 10px 0; color: rgb(249, 244, 244);
-}
+
 .center-toast.show { display:flex; }
 
 /* CARD BASE (sin fondo específico) */
 .center-toast-card {
   width: 92%; max-width: 460px;
   border-radius: 14px;
-  padding: 20px;
+  padding: 24px;
   text-align: left;
   box-shadow: 0 24px 60px rgba(0,0,0,0.8);
+  animation: modalSlideIn 0.3s ease-out;
 }
 
-/* ROJO SÓLIDO GARANTIZADO */
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ROJO SÓLIDO GARANTIZADO para avisos críticos */
 .center-toast-card.red-alert {
-  background-color: #ff3b30 !important;
+  background: linear-gradient(180deg, #ff3b30, #dc2626) !important;
   border: 3px solid #b71c1c !important;
   color: #ffffff !important;
 }
-.center-toast-card.red-alert h3 {
+
+/* Verde para confirmaciones positivas */
+.center-toast-card.green-confirm {
+  background: linear-gradient(180deg, var(--success), #0d9488) !important;
+  border: 3px solid #065f46 !important;
   color: #ffffff !important;
-  margin: 0 0 10px 0;
-  font-size: 1.2rem;
 }
-.center-toast-card.red-alert p {
+
+/* Azul para avisos informativos */
+.center-toast-card.blue-info {
+  background: linear-gradient(180deg, var(--accent-2), #1d4ed8) !important;
+  border: 3px solid #1e3a8a !important;
   color: #ffffff !important;
-  margin: 0 0 16px 0;
-  line-height: 1.4;
+}
+
+.center-toast-card h3 {
+  color: #ffffff !important;
+  margin: 0 0 12px 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.center-toast-card p {
+  color: #ffffff !important;
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+  font-size: 1rem;
 }
 
 .center-toast-actions {
-  display:flex; gap:12px; justify-content:flex-end; margin-top:16px;
+  display:flex; gap:12px; justify-content:flex-end; margin-top:20px;
 }
 
 /* Botones llamativos del modal centrado */
 .btn.strong-accept {
-  background:blue !important;
-  color: #e7e8eb !important;
+  background: linear-gradient(180deg, #ffffff, #e5e7eb) !important;
+  color: #1f2937 !important;
   font-weight: 800;
-  border: 2px solid blue;
+  border: 2px solid #ffffff;
+  min-width: 100px;
 }
+
+.btn.strong-accept:hover {
+  background: linear-gradient(180deg, #e5e7eb, #ffffff) !important;
+  transform: translateY(-2px);
+}
+
 .btn.strong-cancel {
-  background: #ffd166 !important;
-  color: #0b1220 !important;
+  background: linear-gradient(180deg, #fbbf24, #f59e0b) !important;
+  color: #1f2937 !important;
   font-weight: 800;
-  border: 2px solid #ffd166;
+  border: 2px solid #fbbf24;
+  min-width: 100px;
+}
+
+.btn.strong-cancel:hover {
+  background: linear-gradient(180deg, #f59e0b, #fbbf24) !important;
+  transform: translateY(-2px);
 }
 
 /* Toast mini (notificaciones breves) */
@@ -215,12 +351,11 @@ body {
 .toast-mini.ok     { background: var(--success); }
 .toast-mini.info   { background: var(--accent-2); }
 
-
-.app-header p { margin: 0.5rem 0; font-size: 0.9rem; color: #666; }
+.app-header p { margin: 0.5rem 0; font-size: 0.9rem; color: rgba(255,255,255,0.8); }
 .app-header #copy-room { margin-left: 0.5rem; padding: 0.3rem 0.8rem; font-size: 0.8rem; }
-.room-status { font-weight: bold; }
-.room-status.connected { color: #0a84ff; }
-.room-status.local { color: #ff9500; }
+.room-status { font-weight: bold; margin: 4px 0; }
+.room-status.connected { color: #10b981; }
+.room-status.local { color: #ff9f0a; }
 
 /* Responsive */
 @media (max-width:720px){
@@ -228,5 +363,35 @@ body {
   .row { flex-direction:column; align-items:stretch; }
   .app-footer { position: static; margin-top:12px; }
   .container { margin-bottom: 16px; padding-bottom: 80px; }
+  
+  .room-controls {
+    flex-direction: column;
+    gap: 6px;
+  }
+  
+  .room-controls .btn {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  /* En móvil, ambos ocupan el ancho completo */
+  .bote-name-input,
+  .selector-select {
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+  
+  .center-toast-card {
+    padding: 20px;
+    margin: 16px;
+  }
+  
+  .center-toast-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .center-toast-actions .btn {
+    width: 100%;
+  }
 }
-

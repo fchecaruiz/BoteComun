@@ -5,33 +5,59 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>BoteComun</title>
   <link rel="stylesheet" href="boteComun.css">
-  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0a84ff">
 </head>
 <body>
   <header class="app-header">
     <h1>BoteComun</h1>
-    <p id="room-link">Sala: <a id="room-url" href="#" target="_blank" rel="noopener">Compartir sala</a></p>
-    <button id="copy-room" class="btn">Copiar enlace</button>
-    <p id="room-status" class="room-status">Conectando...</p>
+
+    <div class="room-controls">
+      <input id="bote-name" class="bote-name-input" type="text" placeholder="Nombre del bote (p.ej. 2025-09-01 · Cena viernes)" />
+      <button id="new-room" class="btn success" type="button">Nuevo Bote</button>
+      <button id="delete-room" class="btn warn" type="button">Eliminar Bote</button>
+      <button id="copy-room" class="btn" type="button">Copiar enlace</button>
+    </div>
+
+    <div class="bote-selector">
+      <label for="bote-selector" class="selector-label">Seleccionar bote</label>
+      <select id="bote-selector" class="selector-select">
+        <option value="">— Selecciona un bote —</option>
+      </select>
+    </div>
+
+    <p class="current-bote">
+      Bote actual: <strong id="current-bote-name">Ninguno</strong>
+    </p>
+
+    <p id="room-link">
+      URL sala: <a id="room-url" href="#" target="_blank" rel="noopener">Sin seleccionar</a>
+    </p>
+
+    <p id="room-status" class="room-status">Conectando…</p>
     <p class="tagline">Controla aportes y pagos del bote común</p>
   </header>
 
   <main class="container">
-    <section class="panel">
+    <section class="panel panel-disabled" id="register-panel">
       <h2>Registrar</h2>
+      <div class="panel-overlay" id="panel-overlay">
+        <div class="overlay-message">
+          <h3>🔒 Sección bloqueada</h3>
+          <p>Crea un nuevo bote o selecciona uno existente para comenzar</p>
+        </div>
+      </div>
       <form id="entry-form" class="form" autocomplete="off">
         <input id="input-type" type="hidden" value="add" />
         <div class="row">
-          <label>Nombre
+          <label class="flex">Nombre
             <input id="input-name" placeholder="Tu apodo" required>
           </label>
-          <label>Lugar
+          <label class="flex">Lugar
             <input id="input-place" placeholder="Bar, local... (opcional)">
           </label>
         </div>
         <div class="row">
-          <label>Cantidad (€)
+          <label class="flex">Cantidad (€)
             <input id="input-amount" type="number" step="0.01" min="0.01" placeholder="12.50" required>
           </label>
         </div>
@@ -68,6 +94,7 @@
     </section>
   </main>
 
+  <!-- Modal de confirmación para reset -->
   <div id="toast-overlay" class="toast-overlay" aria-hidden="true">
     <div class="toast-card" role="dialog" aria-modal="true" aria-labelledby="toast-title">
       <h3 id="toast-title">Confirmar reset</h3>
@@ -79,6 +106,7 @@
     </div>
   </div>
 
+  <!-- Modal centrado reutilizable -->
   <div id="center-toast" class="center-toast" aria-hidden="true">
     <div class="center-toast-card red-alert" role="dialog" aria-modal="true" aria-labelledby="center-toast-title">
       <h3 id="center-toast-title">Aviso</h3>
@@ -96,13 +124,13 @@
     <p class="footer-text">Bote en Comun para los Amigos</p>
   </footer>
 
-  <!-- Firebase Scripts -->
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // Tu configuración Firebase real
+    // Configuración real de tu proyecto
     const firebaseConfig = {
       apiKey: "AIzaSyBdjDf3gq__Luy-yqaq06B4EnM2MvrbUd0",
       authDomain: "botecomun-aaa5c.firebaseapp.com",
@@ -112,17 +140,14 @@
       appId: "1:410248194999:web:9cc52ea249fd7b65c3d632",
       measurementId: "G-QZDZCEPD7E"
     };
-
     try {
       firebase.initializeApp(firebaseConfig);
       window.__BOTE_FIREBASE = { db: firebase.firestore(), auth: firebase.auth() };
-      
       firebase.auth().signInAnonymously().catch(err => {
         const statusEl = document.getElementById('room-status');
         if (statusEl) statusEl.textContent = 'Auth error: ' + err.code;
         console.error('Auth error:', err);
       });
-      
       console.log('Firebase inicializado correctamente');
     } catch(e) {
       const statusEl = document.getElementById('room-status');
@@ -132,13 +157,5 @@
   </script>
 
   <script src="boteComun.js" defer></script>
-
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function() {
-        navigator.serviceWorker.register('service-worker.js').catch(()=>{});
-      });
-    }
-  </script>
 </body>
 </html>
